@@ -1,78 +1,45 @@
-cmake_minimum_required(VERSION 2.8.12)
-
-project(ornaments)
-
+cmake_minimum_required(VERSION 3.18)
+project(ornaments LANGUAGES C CXX)
 include(GNUInstallDirs)
-
-
-option(USE_HDF5 "Compile with HDF5 support" OFF) #OFF by default
-
-if(USE_HDF5)
-    add_compile_definitions("USE_HDF5=ON")
-endif(USE_HDF5)
-
-set(EXT_PROJECTS_DIR ${PROJECT_SOURCE_DIR}/ext)
-set(CMAKE_CXX_FLAGS_PROFILE "-g")
-
-# Set Release type for builds where CMAKE_BUILD_TYPE is unset
-# This is usually a good default as this implictly enables
-#
-#   CXXFLAGS = -O3 -DNDEBUG
-#
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release")
-endif()
-
-if(${CMAKE_VERSION} VERSION_LESS 3.1)
-    # CMake versions before 3.1 do not understand CMAKE_CXX_STANDARD
-    # remove this block once CMake >=3.1 has fixated in the ecosystem
-    add_compile_options(-std=c++11)
-else()
-    set(CMAKE_CXX_STANDARD 14)
-    set(CMAKE_CXX_STANDARD_REQUIRED ON)
-    set(CMAKE_CXX_EXTENSIONS OFF)
-endif()
-
-#add_compile_options(-Wall -Wno-unused-function)
-
-if(LINK MATCHES static)
-    message("static build")
-ELSE(LINK MATCHES shared)
-    message("shared build")
-ENDIF(LINK MATCHES static)
-
-
 include(ExternalProject)
+
+option(USE_HDF5 "Compile with HDF5 support" OFF)
+set(ORNAMENTS_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}" CACHE STRING "Native engine installation directory")
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+find_package(Threads REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(BZip2 REQUIRED)
+find_package(LibLZMA REQUIRED)
+find_program(AUTOHEADER_EXECUTABLE autoheader REQUIRED)
+find_program(AUTOCONF_EXECUTABLE autoconf REQUIRED)
+find_program(HTSLIB_MAKE_EXECUTABLE NAMES gmake make REQUIRED)
+
+# Configure/build the committed HTSlib API in a private writable copy.
+# No remote dependency sources, and no generated files in the source tree.
+set(HTSLIB_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/htslib-source")
+file(MAKE_DIRECTORY "${HTSLIB_SOURCE}")
+file(COPY "${PROJECT_SOURCE_DIR}/ext/htslib/" DESTINATION "${HTSLIB_SOURCE}"
+     PATTERN "src" EXCLUDE PATTERN "tmp" EXCLUDE PATTERN "*.o" EXCLUDE PATTERN "*.a" EXCLUDE)
+get_filename_component(ZLIB_LIBRARY_DIR "${ZLIB_LIBRARY_RELEASE}" DIRECTORY)
 ExternalProject_Add(htslib
-    PREFIX ${PROJECT_SOURCE_DIR}/ext/htslib
-    SOURCE_DIR ${PROJECT_SOURCE_DIR}/ext/htslib
-    BUILD_IN_SOURCE 1
-    CONFIGURE_COMMAND autoheader && autoconf && ${PROJECT_SOURCE_DIR}/ext/htslib/configure 
-        --prefix=${PREFIX} --disable-bz2 --disable-lzma --disable-libcurl
-    BUILD_COMMAND make lib-static
+    PREFIX "${CMAKE_CURRENT_BINARY_DIR}/htslib-build"
+    SOURCE_DIR "${HTSLIB_SOURCE}"
+    DOWNLOAD_COMMAND ""
+    UPDATE_COMMAND ""
+    BUILD_IN_SOURCE TRUE
+    CONFIGURE_COMMAND ${AUTOHEADER_EXECUTABLE}
+        COMMAND ${AUTOCONF_EXECUTABLE}
+        COMMAND ${CMAKE_COMMAND} -E env "CC=${CMAKE_C_COMPILER}"
+            "CPPFLAGS=-I${ZLIB_INCLUDE_DIRS}" "LDFLAGS=-L${ZLIB_LIBRARY_DIR}"
+            "${HTSLIB_SOURCE}/configure" --disable-bz2 --disable-lzma --disable-libcurl
+    BUILD_COMMAND ${HTSLIB_MAKE_EXECUTABLE} lib-static
+    BUILD_BYPRODUCTS "${HTSLIB_SOURCE}/libhts.a"
     INSTALL_COMMAND ""
 )
-
-include_directories(${htslib_PREFIX}/src/htslib)
-
-
-
-# add_compile_options(-Wdeprecated-register)
-
 add_subdirectory(src)
-include_directories(${EXT_PROJECTS_DIR})
-
-option(BUILD_TESTING "Build unit tests." OFF)
-include(CTest)
-
-if (BUILD_TESTING)
-    add_subdirectory(${EXT_PROJECTS_DIR}/catch)
-
-    # Includes Catch in the project:
-    include_directories(${CATCH_INCLUDE_DIR} ${COMMON_INCLUDES})
-
-    add_subdirectory(unit_tests)
-endif(BUILD_TESTING)
-
-# enable_testing()
-# add_test(MainTest test/tests)

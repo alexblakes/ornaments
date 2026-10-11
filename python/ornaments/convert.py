@@ -206,7 +206,9 @@ def main(genome_vcf_file, gtf_file, transcriptome_file, output_file, coordinate_
   #       'havana_gene', 'transcript_type', 'transcript_support_level', \
   #       'tag', 'level', 'transcript_name', 'havana_transcript', 'exon_id', \
   #       'ont'], axis=1)
-  gtf_df = gtf_df[(gtf_df.feature == 'exon') | (gtf_df.feature == 'transcript')]
+  gtf_df = gtf_df[(gtf_df.feature == 'exon') | (gtf_df.feature == 'transcript')].copy()
+  # Modern gtfparse returns categoricals; sort these labels lexically.
+  gtf_df['feature'] = gtf_df['feature'].astype(str)
   ########################################################################################################################
   #######  Create transcript to exon lookup, which is a map from a transcript to its constituent exons ###########
   print('Creating transcript to exon map')

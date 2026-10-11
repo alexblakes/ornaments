@@ -110,3 +110,23 @@ def test_conflicting_metadata_rejected(tmp_path):
     b.write_text(a.read_text().replace('Description="Genotype"', 'Description="Other"'))
     with pytest.raises(ValueError, match="conflict"):
         merge_vcfs([str(a), str(b)], str(tmp_path / "out.vcf"), ["A"])
+
+
+def test_edge_deletion_survives_conversion_merge_sort(tmp_path):
+    from ornaments.convert import cli
+    from ornaments.merge import merge_vcfs
+    from ornaments.sort import sort_vcf
+    annotation, reference = tmp_path / 'annotation.gtf', tmp_path / 'reference.fa'
+    annotation.write_text('chr1\tsource\ttranscript\t10\t109\t.\t+\t.\tgene_id "g"; transcript_id "tx";\n'
+                          'chr1\tsource\texon\t10\t109\t.\t+\t.\tgene_id "g"; transcript_id "tx"; exon_number "1";\n')
+    reference.write_text('>tx\n' + 'A'*100 + '\n')
+    genomic = tmp_path / 'genomic.vcf.gz'
+    with gzip.open(genomic, 'wt') as stream:
+        stream.write(HEADER.rstrip() + '\tFORMAT\tS\nchr1\t8\t.\tAAAAA\tA\t.\t.\t.\tGT\t0|1\n')
+    converted, merged, ordered = tmp_path / 'converted.vcf', tmp_path / 'merged.vcf', tmp_path / 'sorted.vcf'
+    assert cli(['-v', str(genomic), '-g', str(annotation), '-t', str(reference),
+                '-o', str(converted), '-c', str(tmp_path / 'coords')]) == 0
+    assert 'tx\t-1\t' in converted.read_text()
+    merge_vcfs([str(converted)], str(merged), ['S'])
+    sort_vcf(str(merged), str(ordered))
+    assert 'tx\t-1\t' in ordered.read_text()

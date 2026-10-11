@@ -1,27 +1,39 @@
 package:
   name: ornaments
-  version: "1.0"
-
+  version: "1.1.0"
 source:
   path: .
-
+build:
+  number: 0
 requirements:
-  host:
-    - python =3.6.10
-    - cmake
+  build:
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+    - cmake >=3.18,<4
+    - ninja
     - make
-    - gxx_linux-64  # [linux]
-    - clangxx  # [osx]
+    - autoconf 2.69.*
+  host:
+    - python >=3.10
+    - pip
+    - scikit-build-core >=0.10,<1
+    - zlib
+    - bzip2
+    - xz
   run:
-    - python =3.6.10
-    - gtfparse =1.2.1
-    - biopython =1.78
-
+    - python >=3.10
+    - numpy >=2,<3
+    - biopython >=1.81,<2
+    - pandas >=2,<3
+    - gtfparse >=2.5,<3
+    - zlib
+    - bzip2
+    - xz
 about:
   home: "https://github.com/SeyoungKimLab/Ornaments"
-  license: "MIT"
-  summary: "Ornaments for rapid allele-specific expression quantification at heterozygous loci."
-
-extra:
-  maintainers:
-    - "Abhinav Adduri"
+  license: BSD-3-Clause AND BSD-2-Clause AND MIT
+  license_file:
+    - LICENSE
+    - LICENSE.txt
+    - ext/htslib/LICENSE
+  summary: "Variant-aware RNA-seq preparation and allele-specific expression quantification"

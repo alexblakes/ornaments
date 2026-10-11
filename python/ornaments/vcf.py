@@ -51,7 +51,10 @@ def record_fields(line, path, number, columns):
     if len(fields) != columns or len(fields) < 8 or not fields[0]:
         raise ValueError(f'{path}: malformed VCF record at line {number}')
     try:
-        if int(fields[1]) < 1:
+        # Ornaments represents transcript-start deletions with REF='.' and
+        # a numeric ALT length; their transcript coordinates can be <= 0.
+        edge_deletion = fields[3] == '.' and fields[4].isdigit() and int(fields[4]) > 0
+        if int(fields[1]) < 1 and not edge_deletion:
             raise ValueError()
     except ValueError:
         raise ValueError(f'{path}: invalid VCF position at line {number}') from None

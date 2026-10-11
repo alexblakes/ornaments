@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <zlib.h>
 #include <unordered_set>
+#include <memory>
 #include "kseq.h"
 
 #ifndef KSEQ_INIT_READY
@@ -1539,9 +1540,34 @@ std::unordered_map<std::string, double> load_transcript_weights(std::string file
 }
 
 // Setup variant param entry structure
+// zlib transparently reads both plain and gzip VCFs, including long records.
+static bool readVcfLine(gzFile stream, std::string& line) {
+  line.clear();
+  char buffer[4096];
+  while (gzgets(stream, buffer, sizeof(buffer))) {
+    line += buffer;
+    if (!line.empty() && line.back() == '\n') {
+      line.pop_back();
+      if (!line.empty() && line.back() == '\r') line.pop_back();
+      return true;
+    }
+  }
+  int error = Z_OK;
+  const char* message = gzerror(stream, &error);
+  if (error != Z_OK && error != Z_STREAM_END) {
+    std::cerr << "ERROR: Cannot read VCF: " << message << std::endl;
+    exit(1);
+  }
+  return !line.empty();
+}
+
 void KmerIndex::initVariantParamEntry(std::string vcf_file, std::string sample, bool is_phased) {
   std::cerr << std::endl << "Reading vcf file for sample: " << vcf_file << std::endl;
-  std::ifstream is(vcf_file);
+  std::unique_ptr<gzFile_s, decltype(&gzclose)> is(gzopen(vcf_file.c_str(), "rb"), &gzclose);
+  if (!is) {
+    std::cerr << "ERROR: Cannot open VCF file: " << vcf_file << std::endl;
+    exit(1);
+  }
   std::string line;
   bool skip = false;
   std::vector<VariantParameterEntry> currentParameterRun;
@@ -1558,8 +1584,8 @@ void KmerIndex::initVariantParamEntry(std::string vcf_file, std::string sample, 
     }
   }
 
-  while(std::getline(is, line)) {
-    if (line.find("CHROM") != std::string::npos) {
+  while(readVcfLine(is.get(), line)) {
+    if (line.rfind("#CHROM\t", 0) == 0) {
       skip = true;
       // Get the index corresponding to the current sample
       std::string token;
@@ -1574,7 +1600,7 @@ void KmerIndex::initVariantParamEntry(std::string vcf_file, std::string sample, 
         i += 1;
       }
 
-      if (ind == -1) {
+      if (ind < 9) {
         std::cerr << "ERROR: Specified sample was not found in specified VCF file." << std::endl;
         exit(1);
       } else {
@@ -1583,6 +1609,7 @@ void KmerIndex::initVariantParamEntry(std::string vcf_file, std::string sample, 
       continue;
     }
 
+    if (line.empty() || line[0] == '#') continue;
     if (!skip) { // skip all header lines
       continue;
     }
@@ -1594,6 +1621,7 @@ void KmerIndex::initVariantParamEntry(std::string vcf_file, std::string sample, 
     std::string ref;
     std::string alt;
     std::string genotype;
+    std::string format;
 
     // Read the respective parameters from the current line. Currently only reading first 10
     int i = 0;
@@ -1612,6 +1640,9 @@ void KmerIndex::initVariantParamEntry(std::string vcf_file, std::string sample, 
         case 4:
           alt = token;
           break;
+        case 8:
+          format = token;
+          break;
       }
 
       if (i == ind) {
@@ -1619,6 +1650,25 @@ void KmerIndex::initVariantParamEntry(std::string vcf_file, std::string sample, 
         break;
       }
       i += 1;
+    }
+
+    // Sample values may contain fields in any FORMAT order.
+    std::stringstream format_stream(format);
+    std::string field;
+    int gt_index = 0;
+    bool found_gt = false;
+    while (std::getline(format_stream, field, ':')) {
+      if (field == "GT") { found_gt = true; break; }
+      ++gt_index;
+    }
+    std::stringstream sample_stream(genotype);
+    genotype.clear();
+    for (int field_index = 0; field_index <= gt_index && found_gt; ++field_index) {
+      if (!std::getline(sample_stream, genotype, ':')) { found_gt = false; }
+    }
+    if (!found_gt || genotype.empty()) {
+      std::cerr << "ERROR: Missing GT genotype in VCF at " << tname << ":" << tpos + 1 << std::endl;
+      exit(1);
     }
 
     bool currPhased;
@@ -1781,6 +1831,11 @@ void KmerIndex::initVariantParamEntry(std::string vcf_file, std::string sample, 
 
     prevTranscriptName = tname;
     prevTpos = tpos;
+  }
+
+  if (!skip) {
+    std::cerr << "ERROR: VCF is missing a #CHROM sample header: " << vcf_file << std::endl;
+    exit(1);
   }
 
   // write the last parameter to the list of params

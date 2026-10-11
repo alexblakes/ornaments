@@ -1,65 +1,35 @@
-file(GLOB sources *.cpp)
-file(GLOB headers *.h *.hpp)
+file(GLOB sources CONFIGURE_DEPENDS *.cpp)
+file(GLOB headers CONFIGURE_DEPENDS *.h *.hpp)
+list(REMOVE_ITEM sources "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
 
-list(REMOVE_ITEM sources main.cpp)
-
-include_directories(../ext/htslib)
-
-add_library(kallisto_core ${sources} ${headers})
-target_include_directories(kallisto_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
+add_library(kallisto_core STATIC ${sources} ${headers})
+add_dependencies(kallisto_core htslib)
+target_include_directories(kallisto_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${HTSLIB_SOURCE}")
+target_link_libraries(kallisto_core PUBLIC "${HTSLIB_SOURCE}/libhts.a" Threads::Threads ZLIB::ZLIB BZip2::BZip2 LibLZMA::LibLZMA)
 add_executable(ornaments main.cpp)
-
-find_package( Threads REQUIRED )
-target_link_libraries(ornaments kallisto_core pthread ${CMAKE_CURRENT_SOURCE_DIR}/../ext/htslib/libhts.a)
-
-if(LINK MATCHES static)
-    set(BUILD_SHARED_LIBS OFF)
-    set(HDF5_USE_STATIC_LIBRARIES 1)
-
-    if (UNIX AND NOT APPLE)
-        #set(CMAKE_EXE_LINKER_FLAGS  "-static -static-libgcc -static-libstdc++")
-        set(CMAKE_EXE_LINKER_FLAGS  "-static -static-libstdc++")
-        SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
-        set(CMAKE_EXE_LINKER_FLAGS  "-static -static-libgcc -static-libstdc++")
-    endif(UNIX AND NOT APPLE)
-
-    SET_TARGET_PROPERTIES(ornaments kallisto_core PROPERTIES LINK_SEARCH_END_STATIC 1)
-endif(LINK MATCHES static)
-
-
+target_link_libraries(ornaments PRIVATE kallisto_core)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(ornaments PRIVATE rt)
+endif()
 if(USE_HDF5)
-    find_package( HDF5 REQUIRED )
-endif(USE_HDF5)
-
-find_package( ZLIB REQUIRED )
-
-if ( ZLIB_FOUND )
-    include_directories( ${ZLIB_INCLUDE_DIRS} )
-    target_link_libraries(ornaments kallisto_core ${ZLIB_LIBRARIES} -lbz2 -llzma)
+    find_package(HDF5 REQUIRED COMPONENTS C)
+    target_compile_definitions(kallisto_core PUBLIC USE_HDF5=ON)
+    target_include_directories(kallisto_core PUBLIC ${HDF5_INCLUDE_DIRS})
+    target_link_libraries(kallisto_core PUBLIC ${HDF5_LIBRARIES})
+endif()
+# Conda libraries live in the active environment. Keep installed wheels
+# relocatable to a matching environment instead of embedding a build prefix.
+if(ORNAMENTS_INSTALL_DIR STREQUAL "ornaments/_bin")
+if(APPLE)
+    set_target_properties(ornaments PROPERTIES INSTALL_RPATH "@loader_path/../../../..")
 else()
-    message(FATAL_ERROR "zlib not found. Required for to output files" )
-endif( ZLIB_FOUND )
-
-if(USE_HDF5)
-    if(HDF5_FOUND)
-        include_directories( ${HDF5_INCLUDE_DIRS} )
-        target_link_libraries( kallisto_core ${HDF5_LIBRARIES} -lbz2 -llzma)
-        target_link_libraries( ornaments ${HDF5_LIBRARIES} -lbz2 -llzma)
+    set_target_properties(ornaments PROPERTIES INSTALL_RPATH "$ORIGIN/../../../..")
+endif()
+else()
+    if(APPLE)
+        set_target_properties(ornaments PROPERTIES INSTALL_RPATH "@loader_path/../lib")
     else()
-        message(FATAL_ERROR "HDF5 not found. Required to output files")
+        set_target_properties(ornaments PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
     endif()
-endif(USE_HDF5)
-
-if(LINK MATCHES static)
-    if (UNIX AND NOT APPLE)
-        target_link_libraries(ornaments librt.a -lbz2 -llzma)
-    endif()
-else()
-    if (UNIX AND NOT APPLE)
-        target_link_libraries(ornaments rt -lbz2 -llzma)
-    endif()
-endif(LINK MATCHES static)
-
-
-install(TARGETS ornaments DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()
+install(TARGETS ornaments RUNTIME DESTINATION "${ORNAMENTS_INSTALL_DIR}")

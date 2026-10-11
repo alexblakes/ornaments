@@ -254,11 +254,11 @@ void ParseOptionsEM(int argc, char **argv, ProgramOptions& opt) {
       break;
     }
     case 'v': {
-      stringstream(optarg) >> opt.vcf_file;
+      opt.vcf_file = optarg;
       break;
     }
     case 'a': {
-      stringstream(optarg) >> opt.sample_name;
+      opt.sample_name = optarg;
       break;
     }
     case 'q': {

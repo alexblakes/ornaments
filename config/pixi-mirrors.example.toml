@@ -1,0 +1,12 @@
+# Copy to .pixi/config.toml and substitute the site's URLs before pixi install.
+# Exact mirror mappings do not fall back to the original host unless it is
+# explicitly included in these lists.
+[mirrors]
+"https://conda.anaconda.org/conda-forge" = ["https://packages.example.internal/conda-forge"]
+"https://conda.anaconda.org/bioconda" = ["https://packages.example.internal/bioconda"]
+
+# Only use these PyPI mappings if the mirror preserves both upstream URL
+# layouts and rewrites wheel links accordingly. Otherwise set index-url in
+# pixi.toml as described in docs/airgapped-installation.md.
+"https://pypi.org/simple" = ["https://packages.example.internal/pypi/simple"]
+"https://files.pythonhosted.org/packages" = ["https://packages.example.internal/pypi/packages"]

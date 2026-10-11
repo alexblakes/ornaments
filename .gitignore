@@ -19,3 +19,5 @@ __pycache__/
 dist/
 _build/
 *.egg-info/
+# Lockfiles contain deployment-specific channel URLs; generate inside the site.
+pixi.lock

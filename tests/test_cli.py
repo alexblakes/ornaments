@@ -43,3 +43,15 @@ def test_help_is_lazy():
         'assert not any(x in sys.modules for x in ("numpy", "Bio", "gtfparse"))'],
         capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
+
+
+def test_native_merge_retains_original_interface(monkeypatch, tmp_path, capfd):
+    from ornaments import native
+    engine = tmp_path / '_bin' / 'ornaments'
+    engine.parent.mkdir()
+    engine.write_text(f'#!{sys.executable}\nimport json, sys\nprint(json.dumps(sys.argv[1:]))\n')
+    engine.chmod(0o755)
+    monkeypatch.setattr(native, '__file__', str(tmp_path / 'native.py'))
+    monkeypatch.setattr(sys, 'argv', ['ornaments-native', 'merge', '-o', 'abundances'])
+    assert native.main() == 0
+    assert json.loads(capfd.readouterr().out) == ['merge', '-o', 'abundances']
