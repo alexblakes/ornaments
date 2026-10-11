@@ -12,3 +12,10 @@ ext/zlib-ng/build/
 ext/zlib-ng/tmp/
 
 src/tags
+.pixi/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
+_build/
+*.egg-info/
