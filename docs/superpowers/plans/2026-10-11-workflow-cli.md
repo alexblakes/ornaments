@@ -66,7 +66,7 @@
 - Native binary path is `Path(__file__).parent / "_bin" / "ornaments"`.
 - Preparation modules expose `cli(argv: list[str] | None = None) -> int`; dispatcher imports them only when selected.
 
-- [ ] **Step 1: Add failing tests for help, forwarding, and native errors.**
+- [x] **Step 1: Add failing tests for help, forwarding, and native errors.**
 
 ```python
 def test_top_level_help(capsys):
@@ -89,8 +89,8 @@ Add a test asserting `ornaments-native merge` forwards native `merge`, while pub
 `merge` invokes the Python adapter. Assert missing engine reports its expected
 path and a nonzero status.
 
-- [ ] **Step 2: Run `PYTHONPATH=python python -m pytest tests/test_cli.py -q`; expect import failures before scaffolding.**
-- [ ] **Step 3: Implement lazy dispatch, help, and private executable lookup.**
+- [x] **Step 2: Run `PYTHONPATH=python python -m pytest tests/test_cli.py -q`; expect import failures before scaffolding.**
+- [x] **Step 3: Implement lazy dispatch, help, and private executable lookup.**
 
 ```python
 def run(argv: list[str]) -> int:
@@ -107,8 +107,8 @@ Handle user input exceptions at the CLI boundary with stderr and nonzero
 status; propagate native status. Keep unrecognized command handling clear and
 list supported commands. Forward existing non-conflicting native commands.
 
-- [ ] **Step 4: Run focused dispatcher tests and confirm help does not import scientific libraries.**
-- [ ] **Step 5: Commit the dispatcher and tests with `feat: add unified workflow dispatcher`.**
+- [x] **Step 4: Run focused dispatcher tests and confirm help does not import scientific libraries.**
+- [x] **Step 5: Commit the dispatcher and tests with `feat: add unified workflow dispatcher`.**
 
 ### Task 2: Conversion, merging, and sorting
 
@@ -121,7 +121,7 @@ list supported commands. Forward existing non-conflicting native commands.
 - `sort.sort_vcf(input_path: str, output_path: str, *, temp_dir: str | None = None, chunk_size: int = 100000) -> None` sorts stably by `(transcript, numeric_position, original_ordinal)`.
 - Each command implements `cli(argv=None) -> int`; conversion retains its existing `main(...)` scientific signature.
 
-- [ ] **Step 1: Add regression fixtures with actual VCF headers and FORMAT fields.**
+- [x] **Step 1: Add regression fixtures with actual VCF headers and FORMAT fields.**
 
 ```python
 def test_sort_across_chunks_preserves_ties(tmp_path):
@@ -142,8 +142,8 @@ duplicating identical lines. Test empty body, missing samples, blank input-list
 lines, gzipped input, invalid numeric POS with line number, and same input/output
 path rejection. Preserve INFO and FORMAT rather than dropping fields silently.
 
-- [ ] **Step 2: Run `PYTHONPATH=python python -m pytest tests/test_vcf.py -q`; expect missing module failures.**
-- [ ] **Step 3: Implement VCF preparation and expose conversion as a callable adapter.**
+- [x] **Step 2: Run `PYTHONPATH=python python -m pytest tests/test_vcf.py -q`; expect missing module failures.**
+- [x] **Step 3: Implement VCF preparation and expose conversion as a callable adapter.**
 
 ```python
 # Conversion's CLI adapter preserves existing flag names.
@@ -163,8 +163,8 @@ fields. Sorting uses `TemporaryDirectory`, sorted chunks and `heapq.merge`;
 clean intermediate files on errors. Reject input/output aliases before opening
 outputs. Keep filenames with spaces intact and validate minimum VCF columns.
 
-- [ ] **Step 4: Run preparation tests and conversion help through both unified and legacy interfaces.**
-- [ ] **Step 5: Commit with `feat: expose conversion merge and stable VCF sorting`.**
+- [x] **Step 4: Run preparation tests and conversion help through both unified and legacy interfaces.**
+- [x] **Step 5: Commit with `feat: expose conversion merge and stable VCF sorting`.**
 
 ### Task 3: Personalization and legacy adapters
 
@@ -172,7 +172,7 @@ outputs. Keep filenames with spaces intact and validate minimum VCF columns.
 
 **Interfaces:** Preserve `personalize.main(tfasta, tvcf, output_type, output_file, samples, coordinates, k)`; `personalize.cli(argv=None) -> int` validates inputs first. Reuse `vcf.read_samples` from Task 2.
 
-- [ ] **Step 1: Add failing tests that mock the scientific operation, exercising real parsing and validation.**
+- [x] **Step 1: Add failing tests that mock the scientific operation, exercising real parsing and validation.**
 
 ```python
 def test_all_resolves_header_samples(monkeypatch, tmp_path):
@@ -194,8 +194,8 @@ diploid coordinates reach the scientific function. Check invalid k: it must be
 positive, odd, and within the native engine's supported limit read from
 `src/Kmer.hpp`. Check input/output aliases, including coordinates output.
 
-- [ ] **Step 2: Run `PYTHONPATH=python python -m pytest tests/test_personalize.py -q`; expect failing import or validation.**
-- [ ] **Step 3: Implement header resolution and validation before scientific execution.**
+- [x] **Step 2: Run `PYTHONPATH=python python -m pytest tests/test_personalize.py -q`; expect failing import or validation.**
+- [x] **Step 3: Implement header resolution and validation before scientific execution.**
 
 ```python
 available = read_samples(args.transcriptome_vcf)
@@ -214,8 +214,8 @@ Keep all three root script help/argument contracts, and expose installed
 legacy helpers through console entry points. Make root wrappers import the
 source package explicitly when run from an uninstalled checkout.
 
-- [ ] **Step 4: Run focused personalization tests and legacy help checks.**
-- [ ] **Step 5: Commit with `feat: add validated personalization commands`.**
+- [x] **Step 4: Run focused personalization tests and legacy help checks.**
+- [x] **Step 5: Commit with `feat: add validated personalization commands`.**
 
 ### Task 4: Local wheel build and Pixi mirror installation
 
@@ -223,7 +223,7 @@ source package explicitly when run from an uninstalled checkout.
 
 **Interfaces:** Wheel contains `ornaments/_bin/ornaments` and all Python modules. Public scripts are `ornaments`, `ornaments-native`, `convert_genomic_vcf_to_transcriptomic_vcf`, `merge_transcriptome_vcfs`, `create_personalized_transcriptome`, and `sort_transcriptome_vcf`.
 
-- [ ] **Step 1: Add installed-layout tests and inspect current Pixi/gtfparse/build backend primary documentation before fixing version ranges.**
+- [x] **Step 1: Add installed-layout tests and inspect current Pixi/gtfparse/build backend primary documentation before fixing version ranges.**
 
 ```python
 def test_native_uses_packaged_location(monkeypatch, tmp_path):
@@ -242,7 +242,7 @@ def test_native_uses_packaged_location(monkeypatch, tmp_path):
     assert received[0][1].get("shell", False) is False
 ```
 
-- [ ] **Step 2: Define the local build and entry points.**
+- [x] **Step 2: Define the local build and entry points.**
 
 ```toml
 [build-system]
@@ -273,7 +273,7 @@ Include license metadata and source distribution files. Configure CMake's
 install path via a packaging-specific variable so ordinary CMake still
 installs the native engine to `bin`.
 
-- [ ] **Step 3: Modernize local CMake without changing native algorithm code.**
+- [x] **Step 3: Modernize local CMake without changing native algorithm code.**
 
 Use CMake >=3.18, `Threads::Threads`, and explicit compression library discovery.
 Copy vendored HTSlib into the CMake binary directory before building; its
@@ -284,7 +284,7 @@ compression/network features. Preserve native dependencies on zlib, bzip2 and
 lzma as required by the existing engine. Use generator-independent native
 make for HTSlib, not Ninja. Include all vendored sources in sdist.
 
-- [ ] **Step 4: Define Pixi environment and tasks.**
+- [x] **Step 4: Define Pixi environment and tasks.**
 
 ```toml
 [workspace]
@@ -309,7 +309,7 @@ build and focused-check tasks. Update legacy Conda recipe/build script to
 install the same package and aliases with local source and declared build
 requirements; remove Python 3.6 pins and outside-channel assumptions.
 
-- [ ] **Step 5: Write site configuration and explicit mirror installation instructions.**
+- [x] **Step 5: Write site configuration and explicit mirror installation instructions.**
 
 Verify the current Pixi config schema before writing
 `config/pixi-mirrors.example.toml`. Show conda-forge/bioconda mappings and
@@ -320,13 +320,13 @@ to public servers. Document transferring source, installing Pixi beforehand,
 solving inside the site, handling lockfile URLs and caches, and staging a wheel
 for a matching platform. Keep credential placeholders out of URLs.
 
-- [ ] **Step 6: Run `pixi install`, focused tests, `pixi run python -m build`, and inspect wheel and sdist inventories.**
+- [x] **Step 6: Run `pixi install`, focused tests, `pixi run python -m build`, and inspect wheel and sdist inventories.**
 Expected: wheel contains executable and modules; sdist contains HTSlib and C++
 sources. Inspect dependency links of the built engine and document runtime
 libraries. Sandbox-related network failures require the normal escalation
 route. A package resolution or build failure is a defect to fix, not grounds
 for substituting a mock build.
-- [ ] **Step 7: Commit with `build: package workflow CLI for Pixi mirror environments`.**
+- [x] **Step 7: Commit with `build: package workflow CLI for Pixi mirror environments`.**
 
 ### Task 5: Real workflow, installation checks, and documentation
 
@@ -337,7 +337,7 @@ for substituting a mock build.
 root, and writes all products to a temporary directory. It accepts a CLI path
 so the same check can exercise Pixi and a separately installed wheel.
 
-- [ ] **Step 1: Add the real example workflow with assertions on outputs.**
+- [x] **Step 1: Add the real example workflow with assertions on outputs.**
 
 ```python
 def invoke(executable, *args):
@@ -371,13 +371,13 @@ coordinate output, and native quantification products `allele_counts.txt`,
 use shipped expected examples for deterministic scientific comparisons where
 their provenance matches the tested command. Do not invent expression values.
 
-- [ ] **Step 2: Run the complete integration script in Pixi, then repair only failures necessary for the approved workflow.**
+- [x] **Step 2: Run the complete integration script in Pixi, then repair only failures necessary for the approved workflow.**
 Expected: all real stages finish with zero status and usable outputs. Include
 an output directory containing spaces. If an algorithm failure arises, use
 the debugging skill before fixing it and pin any discovered regression with a
 focused check.
 
-- [ ] **Step 3: Install the built wheel into a temporary environment and exercise it outside the repository.**
+- [x] **Step 3: Install the built wheel into a temporary environment and exercise it outside the repository.**
 Use the Pixi Python to create a temporary environment with access to supplied
 runtime libraries, install the wheel with `pip --no-deps --no-index`, change
 working directory to a temporary path, run the example integration script
@@ -385,18 +385,18 @@ with that environment's absolute CLI path, and run all legacy `--help`
 commands. This checks artifact completeness independently of source imports;
 it does not claim a dependency-free wheel.
 
-- [ ] **Step 4: Replace obsolete README installation guidance and add the exact six-step example.**
+- [x] **Step 4: Replace obsolete README installation guidance and add the exact six-step example.**
 Show source Pixi installation and link the mirror guide. Explain public/native
 merge semantics, selected sample behavior, sorting, k consistency, diploid
 coordinates output, optional HDF5, legacy entry points and platform scope.
 Keep examples consistent with actual filenames produced by integration.
 
-- [ ] **Step 5: Run focused tests and integration once after final edits; inspect Git diff and configuration for download dependencies.**
+- [x] **Step 5: Run focused tests and integration once after final edits; inspect Git diff and configuration for download dependencies.**
 Record Pixi version, tested platform, package build and actual integration
 results. Report untested Linux and site mirror deployment if unavailable.
 Review the completed branch according to the chosen execution skill, fix
 findings, and repeat only checks affected by fixes.
-- [ ] **Step 6: Commit with `docs: document and verify the complete installed workflow`.**
+- [x] **Step 6: Commit with `docs: document and verify the complete installed workflow`.**
 
 ## Execution Handoff
 

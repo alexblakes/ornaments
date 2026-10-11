@@ -1,318 +1,196 @@
 # Ornaments
-Ornaments is a lightweight modification of kallisto that facilitates
-variant-aware pseudoalignment of RNA-seq reads to obtain expected allele-specific read counts 
-at heterozygous variant loci in addition to transcriptome quantification. 
-The Ornaments method is described in detail in
 
-[Abhinav Adduri and Seyoung Kim. Ornaments for efficient allele-specific expression estimation with bias correction. The American Journal of Humans Genetics, 2024.](https://www.sciencedirect.com/science/article/pii/S0002929724002210?dgcid=author)
+Ornaments extends kallisto with variant-aware pseudoalignment of RNA-seq reads
+and allele-specific expression estimates at heterozygous loci. It provides
+commands for converting genomic variants, preparing a personalized
+transcriptome, building an index, and quantifying expression.
 
-Ornaments takes as input an ornament personalized transcriptome and reads.
-Ornaments requires that the variants are listed in transcriptomic coordinates. 
-We provide helper scripts to transform the variant coordinates from genomic to transcriptomic coordinates
-and to generate an ornament personalized transcriptome from 
-a list of variants (both SNPs and indels are supported) and a reference transcriptome.
+The method is described in [Adduri and Kim, *Ornaments for efficient
+allele-specific expression estimation with bias correction*, AJHG (2024)](https://www.sciencedirect.com/science/article/pii/S0002929724002210).
 
-## Compiling
-To compile ornaments, cmake is required. First, clone the repository and go into the
-ornaments folder. 
+## Install with Pixi
 
-```
-git clone https://github.com/SeyoungKimLab/Ornaments.git
-cd Ornaments
+Use Pixi 0.80.0 or newer. From a local copy of this repository:
+
+```bash
+pixi install
+pixi run ornaments --help
 ```
 
-Next, we need to create a build folder. This folder will contain the ornaments executable.
+Pixi installs the Python package and compiles its bundled native engine. All
+build dependencies come from conda-forge/bioconda or PyPI; HTSlib is included in
+the repository. The manifest targets Linux x86-64 and macOS x86-64/ARM64, with
+Python 3.11. The package supports Python >=3.10. HDF5 is optional and disabled
+by default. macOS source builds require Apple's command line SDK to be
+installed beforehand; Linux build tools and sysroots are supplied by Conda.
 
-```
-mkdir build
-cd build
-```
+For a restricted environment, **configure internal mirror URLs before running
+`pixi install`**. See [airgapped installation](docs/airgapped-installation.md)
+for strict mirror configuration, lockfiles, source and wheel deployment, and
+fully offline operation. No separate ornaments channel is needed.
 
-Finally, we will build the executable using cmake. You will also need autoconf and HDF5 C library installed. If you do not have them installed, you can get them on Mac by using [Homebrew](https://brew.sh/) and running 
+Run commands with `pixi run ornaments`, or enter `pixi shell` and use
+`ornaments` directly. Every workflow command has `--help`.
 
-```
-brew install cmake
-brew install hdf5
-```
+## Complete example workflow
 
-On a Linux machine, you can install them using 
+The included `examples/` files are sufficient to run all stages. Put generated
+outputs in a new working directory:
 
-```
-sudo apt-get install cmake
-sudo apt-get install libhdf5-dev
-```
+```bash
+mkdir -p work
 
-Lastly, we need to install a specific version of autoconf:
+# 1. Convert genomic coordinates to transcript coordinates.
+pixi run ornaments convert \
+  -v examples/truncated_chr1.vcf.gz \
+  -g examples/truncated_v36.annotation.gtf \
+  -t examples/truncated_transcriptome.fasta \
+  -o work/converted.vcf -c work/conversion.tsv
 
-```
-curl -O http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz
-tar zxvf autoconf-2.69.tar.gz
-cd autoconf-2.69
-./configure && make && sudo make install
-cd ..
-```
+# 2. Merge input files and select samples (also useful for one input file).
+printf '%s\n' work/converted.vcf > work/vcfs.txt
+pixi run ornaments merge -i work/vcfs.txt -s HG00405 -o work/merged.vcf
 
-Then, run
+# 3. Sort by transcript name and numeric variant position.
+pixi run ornaments sort -i work/merged.vcf -o work/sorted.vcf
 
-```
-cmake ..
-make
-```
+# 4. Construct the ornament personalized transcriptome.
+pixi run ornaments personalize \
+  -f examples/truncated_transcriptome.fasta -v work/sorted.vcf \
+  -t ornament -o work/HG00405.ornament.fa -s HG00405 -k 31
 
-An executable will be built with the path/name _Ornaments/build/src/ornaments_. If you would rather install the software
-in your home directory, rather than the above, you should run
-```
-cmake .. -DCMAKE_INSTALL_PREFIX:PATH=$HOME
-make install
-```
+# 5. Build an index using the same k as personalization.
+pixi run ornaments index \
+  -i work/HG00405.ornament.index -k 31 work/HG00405.ornament.fa
 
-This will build an executable at _$HOME/bin/ornaments_. If you are facing issues with build dependencies, please cross-reference with the [kallisto installation guide](https://pachterlab.github.io/kallisto/source).
-
-## Data
-Example reference transcriptome and transcript annotation files necessary for the helper scripts can be found [here](https://www.gencodegenes.org/human/).
-
-You can download variant files [here](http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20201028_3202_phased/). The files of interest are the .vcf.gz files that contain a list of all the phased variants, separated by chromosome.
-
-For convenience, we have included a set of example files in the _examples_ folder, which we will use in the workflow examples below.
-
-## Setting up the dependencies
-In order to run Ornaments, you need to have [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) installed. Once you have installed conda, install the [biopython](https://anaconda.org/conda-forge/biopython) and [gtfparse](https://anaconda.org/bioconda/gtfparse) packages:
-
-```
-conda create --name ornaments python=3.6.10
-conda activate ornaments
-conda config --add channels bioconda
-conda config --add channels conda-forge
-conda install -c bioconda gtfparse=1.2.1
-conda install -c conda-forge biopython=1.78
+# 6. Quantify paired reads.
+pixi run ornaments quant \
+  -i work/HG00405.ornament.index -o work/paired \
+  --vcf work/sorted.vcf --sample HG00405 \
+  examples/HG00405_1.fastq examples/HG00405_2.fastq
 ```
 
-These packages are not needed to run Ornaments itself, but are needed for the helper scripts described below to prepare the inputs to Ornaments. 
+For single reads, supply the fragment length mean and standard deviation:
 
-If you have an M-chip Macbook, you should instead run:
-
-```
-arch -x86_64 zsh
-CONDA_SUBDIR=osx-64 conda create -n ornament python=3.6.10
-conda activate ornament
-```
-
-and the remaining steps stay the same.
-
-## Conda Installation
-
-Ornaments is also available via conda installation. After creating the ornaments conda environment and activating it, you can run:
-
-```
-conda install abhinadduri::ornaments
+```bash
+pixi run ornaments quant \
+  -i work/HG00405.ornament.index -o work/single \
+  --vcf work/sorted.vcf --sample HG00405 --single -l 150 -s 25 \
+  examples/HG00405.fastq
 ```
 
-This will make the `ornaments` binary, as well as the `convert_genomic_vcf_to_transcriptomic_vcf`, `merge_transcriptome_vcfs`, and `create_personalized_transcriptome` binaries, globally available on your system. These binaries are described in more detail below.
+Quantification writes `allele_counts.txt` (expected allele-specific counts),
+`tpms.txt` (transcript TPM estimates), and `thetas.txt` (transcript probability
+estimates) into the output directory. Reference transcriptome inputs without
+ornaments use the underlying kallisto behavior.
 
-## Preparation of variants
+## Command details
 
+| Command | Inputs | Outputs |
+| --- | --- | --- |
+| `convert` | gzipped genomic VCF, annotation GTF, reference FASTA | transcriptomic VCF and coordinate conversion map |
+| `merge` | text file listing VCF paths; sample name or sample-name file | merged VCF with selected sample columns |
+| `sort` | transcriptomic VCF | stable sorted VCF |
+| `personalize` | reference FASTA, transcriptomic VCF, samples, mode | personalized FASTA; coordinates in diploid mode |
+| `index` | personalized FASTA, k | native index |
+| `quant` | index, sorted transcriptomic VCF, sample, FASTQ reads | expression and allele counts |
 
+Use compatible reference FASTA and GTF releases. `convert --no-prepend-chr`
+disables adding `chr` when matching annotation chromosome names. Conversion
+reports inconsistent reference alleles; a compatible reference and annotation
+should yield zero inconsistencies.
 
-Here are helper scripts to transform the variant coordinates from genomic to transcriptomic coordinates,
-to sort the variants, and to merge the variant files. The output variant file from these scripts will be
-used as input to construct an ornament personalized transcriptome.
+`merge -i` lists one input path per line, relative to the working directory.
+Blank lines are ignored. `-s` accepts a single sample name or a file listing
+sample names in the desired output order; an empty sample file selects all
+samples from the first input. Every input must contain every selected sample.
+Merging retains **all variant records**, including homozygous alternatives
+needed by personalization, and preserves VCF metadata, INFO, FORMAT, and sample
+fields. It concatenates records rather than combining duplicate loci or
+recalculating cohort-level INFO annotations. Sort after merging chromosome files.
 
+`sort` uses temporary sorted runs to bound memory and file descriptors. It
+retains headers and stable order for equal transcript/position keys. Use
+`--temp-dir DIRECTORY` to place temporary files on suitable storage or
+`--chunk-size RECORDS` to tune memory use. Merge and sort accept plain or
+`.gz` VCF inputs and outputs and replace outputs only after successful writes.
+Transcript-start edge deletions use the converter’s special nonpositive
+positions and remain intact through merging and sorting. Do not use the same
+file for input and output.
 
+`personalize -s` accepts comma-separated sample names or `ALL`. k must be odd
+and between 3 and 31; the default is 31. Always use the same k for personalization
+and indexing. Variants must use transcript coordinates; retain phased genotypes
+for diploid construction.
 
-### Extracting transcriptome variants and converting coordinates 
+For a diploid FASTA with `_L` and `_R` transcript alleles, select one sample and
+provide the **coordinates output** path with `-c`:
 
-The script `convert_genomic_vcf_to_transcriptomic_vcf.py` extracts transcriptome variants located in exonic regions and transforms
-the genomic coordinates of variants to transcriptomic coordinates.
-
-
-```
-Usage: python3 convert_genomic_vcf_to_transcriptomic_vcf.py -v <file_vcf> -g <file_annot> -t <file_tr> -o <file_tr_vcf> -c <file_conv>
-
--v <file_vcf>:		input gzipped VCF file for variants in genomic coordinates
--g <file_annot>: 	input transcript annotation file
--t <file_tr>: 		input reference transcriptome file
--o <file_tr_vcf>: 	output VCF file for transcriptome variants in transcriptomic coordinates 
--c <file_conv>: 	output file with information on coordinate conversions
-```
-
-Example usage:
-
-```
-python3 convert_genomic_vcf_to_transcriptomic_vcf.py \
--v examples/truncated_chr1.vcf.gz \
--g examples/truncated_v36.annotation.gtf \
--t examples/truncated_transcriptome.fasta \
--o examples/truncated_chr1.transcriptome.vcf \
--c examples/truncated_chr1.transcriptome.coords
-```
-
-
-A compatible reference transcriptome and transcript annotation file should be used. 
-If you are getting both files from the same source, make sure that the version is the same. If the
-versions are the same, then you should see the following output from the script:
-
-
-```
-Number of SNPs inconsistent with conversion:  0
-```
-
-### Merging files (if there are multiple transcriptome variant files)
-
-If your variants are stored in multiple files (e.g., your variants span more than one chromosome and
-each file stores one chromosome at a time), these files should be merged into a single file.
-The script merge_transcriptome_vcfs.py merges the transcriptome variant files from the previous step,
-retaining only variants that are heterozygous in at least one of the samples. 
-
-```
-Usage: python3 merge_transcriptome_vcfs.py -i <file_list> -o <file_vcf> -s <samples>
-
--i <file_list>: 	input file listing the VCF files to be merged, with one file name in each line
--o <file_vcf>: 		output merged VCF file for variants in transcriptomic coordinates
--s <samples>: 		input file with a list of sample names, one sample name in each line, if processing multiple samples,
-                        or a single sample name, if processing a single sample
-			(Variant data for all samples in <samples>  should be provided in each VCF file listed in <file_list>)
+```bash
+pixi run ornaments personalize \
+  -f examples/truncated_transcriptome.fasta -v work/sorted.vcf \
+  -t diploid -o work/HG00405.diploid.fa -s HG00405 \
+  -c work/HG00405.diploid.coords
 ```
 
+This coordinates file is produced by diploid generation; it is separate from
+the genomic-to-transcriptomic conversion map. Quantification accepts plain and
+gzipped transcriptomic VCFs and validates that the requested sample is present.
 
-Example usage:
-```
-echo "examples/truncated_chr1.transcriptome.vcf" > file_list.txt
-python merge_transcriptome_vcfs.py -i file_list.txt -o examples/transcriptome.vcf -s HG00405
-```
-In the examples folder, we consider a single VCF file for one chromosome. Running this script will retain only the variants that are heterozygous in at least one sample. However, in general, if you have a single variant file, you can skip this step.
+## Existing command compatibility
 
-### Sorting (if variants are not sorted in transcriptome variant files)
-If variants in the VCF file you started with are already sorted, you can skip this part. 
-Otherwise, you can use this command to sort the variants for each transcript 
-in the transcriptome variant file, to sort the transcriptome VCF, taken from 
-[here](https://www.biostars.org/p/299659/).
+These installed helper names retain their short and long argument flags:
 
-```
-cat examples/transcriptome.vcf | awk '$1 ~ /^#/ {print $0;next} {print $0 | "sort -k1,1 -k2,2n"}' > examples/sorted.transcriptome.vcf
-```
+- `convert_genomic_vcf_to_transcriptomic_vcf`
+- `merge_transcriptome_vcfs`
+- `create_personalized_transcriptome`
+- `sort_transcriptome_vcf` (new)
 
-You should replace `transcriptome.vcf` with your file name. 
+The root `.py` scripts remain usable from a checkout with installed Python
+dependencies. The unified CLI also forwards the original native `version`,
+`cite`, `inspect`, `bus`, `quant-only`, `pseudo`, and `h5dump` commands.
+`ornaments-native` exposes the complete original native interface.
 
-## Ornament personalized transcriptome
-The script `create_personalized_transcriptome.py` modifies the reference transcriptome with the variant information that was prepared above, and produces an ornament personalized transcriptome. This script can also be used to generate a diploid personalized transcriptome.
+**`ornaments merge` now merges VCFs.** Use `ornaments-native merge` for the
+original native abundance merge operation. Native commands retain their
+existing flags and exit status. Optional HDF5 commands require a build with
+HDF5 support enabled.
 
-```
-Usage: python3 create_personalized_transcriptome.py -f <file_tr> -v <file_vcf> -t <opt> -o <file_ptr> -s <SAMPLE>
+## Build and verify
 
--f <file_tr>: 		input reference transcriptome file
--v <file_vcf>:		input VCF file for variants in transcriptome coordinates
--t <opt>: 		set <opt> to ornament for ornament personalized transcriptome or 
-                            to diploid for diploid personalized transcriptome
--o <file_ptr>:		output file containing ornament or diploid personalized transcriptome
--s <SAMPLE>: 		one desired sample from the VCF file, i.e. "HG00405" which should be contained in <file_vcf>
--k <kmer_len>: 		the length of kmer to use for ornament transcriptome construction, default = 31
+```bash
+pixi run test
+pixi run example-workflow
+pixi run build-package
 ```
 
-When argument `-t ornament` is used,
-the output file `<file_ptr>` contains the ornament personalized transcriptome to be used as an input file to Ornaments. 
+After changing local source, use `pixi reinstall ornaments` to rebuild the
+installed package before testing.
 
+The example check runs conversion, merge, sorting, ornament and diploid
+construction, indexing, and paired and single quantification against real
+bundled data. Packaging produces a platform wheel and a source distribution in
+`dist/`. See the installation guide for compatible wheel runtime environments.
 
+A standalone native build remains available with installed compiler,
+compression libraries, CMake, make, and autoconf 2.69:
 
-Diploid personalized transcriptome contains left (suffixed by `_L`) and right 
-(suffixed by `_R`) alleles for each transcript, 
-wherein the phased variants have been imputed into each transcript. 
-
-Example usage to create ornament personalized transcriptome:
-```
-python3 create_personalized_transcriptome.py \
--f examples/truncated_transcriptome.fasta \
--v examples/truncated_chr1.transcriptome.vcf \
--t ornament \
--o HG00405.ornament.fa \
--s HG00405
+```bash
+cmake -S . -B build
+cmake --build build
+cmake --install build --prefix /path/to/install
 ```
 
+This installs the original native binary and requires the Python package
+separately for preparation subcommands. The HTSlib build uses a writable copy
+under the build directory; it performs no downloads.
 
-Example usage to create diploid personalized transcriptome:
-```
-python3 create_personalized_transcriptome.py \
--f examples/truncated_transcriptome.fasta \
--v examples/truncated_chr1.transcriptome.vcf \
--t diploid \
--o HG00405.diploid.fa \
--s HG00405
-```
+## Reference data
 
+Reference transcriptomes and matching annotations are available from
+[GENCODE](https://www.gencodegenes.org/human/). Phased genomic variants may be
+obtained from [1000 Genomes](http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20201028_3202_phased/).
+Download and transfer data separately when working in a restricted environment.
 
-## Ornaments 
-
-Given the ornaments personalized transcriptome above, Ornaments is run with two successive commands: `ornaments index` for generating an ornaments index and `ornaments quant` for quantification of transcriptome and allele-specific expression at heterozygous variant loci.
-
-### index
-
-
-```
-Usage: build/src/ornaments index -i <file_index> -k <k> <file_fasta>
-
-Arguments:
--i <file_index>:	output file that contains an ornament index 
-<file_fasta>:		input file for ornament personalized transcriptome to run ornaments or for reference transcriptome to run kallisto
--k <k>:			k-mer length to be used for index construction, default = 31
-
-```
-
-Ornaments expands the functionality of kallisto, meaning it functions differently 
-only if an ornament personalized transcript is provided for `<file_fasta>` as input. Otherwise, with a reference transcriptome, 
-it behaves the same as kallisto.
-`ornaments index` can automatically detect whether or not the input `<file_fasta>` is an ornament personalized transcriptome or a reference transcriptome. 
-
-
-Example usage to construct an ornament index:
-
-```
-build/src/ornaments index -i HG00405.ornament.index HG00405.ornament.fa
-```
-
-### quant
-
-```
-Usage:  
-build/src/ornaments quant -i <file_index> -o <dir_out> --vcf <file_vcf> --sample <SAMPLE> <file_fastq1> <file_fastq2> 
-build/src/ornaments quant -i <file_index> -o <dir_out> --vcf <file_vcf> --sample <SAMPLE> --single -l <d_l> -s <d_s> <file_fastq>
-
-Arguments:
--i <file_index>:	input file for ornament index 
--o <dir_out>: 		two output files will be added to the <dir_out> folder 
-                        `allele_counts.txt` for expected allele specific-read counts 
-                        `tpms.txt` for TPM estimates for transcripts 
-                        `thetas.txt` for probability estimates for transcripts (# num reads / # total reads)
---vcf <file_vcf>:	input VCF file for transcriptome variants in transcriptomic coordinates that are sorted in each transcript
---sample <SAMPLE>: 	a sample name from the VCF file <file_vcf>
-<file_fastq1>:		FASTQ file 1 in paired-end reads 
-<file_fastq2>: 		FASTQ file 2 in paired-end reads
---single:		flag for single-end reads 
--l <d_l>: 		fragment length mean for single-end reads
--s <d_s>: 		standard deviation for single-end reads
-<file_fastq>:		FASTQ file for single-end reads
-```
-
-Example usage to quantify with paired-end reads for sample `HG00405`:
-
-```
-build/src/ornaments quant \
--i examples/HG00405.ornament.index \
--o output_dir \
---vcf examples/sorted.transcriptome.vcf \
---sample HG00405 \
-examples/HG00405_1.fastq examples/HG00405_2.fastq
-```
-
-Example usage to quantify with single-end reads for sample `HG00405`: 
-```
-build/src/ornaments quant \
--i examples/HG00405.ornament.index \
--o output_dir \
---vcf examples/sorted.transcriptome.vcf \
---sample HG00405 \
---single \
--l 150 \
--s 25 \
-examples/HG00405.fastq
-```
-
-Ornaments is built as an addition to kallisto. All credit for the kallisto software is given to its original authors.
+Ornaments builds on kallisto; credit for kallisto belongs to its original
+authors. See `LICENSE`, `LICENSE.txt`, and the included HTSlib license.
