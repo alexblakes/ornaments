@@ -19,7 +19,7 @@ if(USE_HDF5)
 endif()
 # Conda libraries live in the active environment. Keep installed wheels
 # relocatable to a matching environment instead of embedding a build prefix.
-if(ORNAMENTS_INSTALL_DIR STREQUAL "ornaments/_bin")
+if(ORNAMENTS_INSTALL_DIR MATCHES "ornaments/_bin$")
 if(APPLE)
     set_target_properties(ornaments PROPERTIES INSTALL_RPATH "@loader_path/../../../..")
 else()

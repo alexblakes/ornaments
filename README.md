@@ -17,10 +17,13 @@ pixi install
 pixi run ornaments --help
 ```
 
-Pixi installs the Python package and compiles its bundled native engine. All
-build dependencies come from conda-forge/bioconda or PyPI; HTSlib is included in
-the repository. The manifest targets Linux x86-64 and macOS x86-64/ARM64, with
-Python 3.11. The package supports Python >=3.10. HDF5 is optional and disabled
+The Pixi workspace and package definition are in `pyproject.toml`. Following
+[Pixi’s C++ build guide](https://pixi.prefix.dev/latest/build/cpp/),
+`pixi-build-cmake` builds a Conda package containing the Python CLI and bundled
+native engine. Build and runtime dependencies come from conda-forge/bioconda;
+HTSlib is included in the repository. Pixi build support is a preview feature.
+The manifest targets Linux x86-64 and macOS x86-64/ARM64, with Python 3.11.
+The Python package supports Python >=3.10. HDF5 is optional and disabled
 by default. macOS source builds require Apple's command line SDK to be
 installed beforehand; Linux build tools and sysroots are supplied by Conda.
 
@@ -28,6 +31,21 @@ For a restricted environment, **configure internal mirror URLs before running
 `pixi install`**. See [airgapped installation](docs/airgapped-installation.md)
 for strict mirror configuration, lockfiles, source and wheel deployment, and
 fully offline operation. No separate ornaments channel is needed.
+
+To install the source package into another Pixi workspace:
+
+```bash
+pixi workspace preview add pixi-build
+pixi workspace channel add bioconda
+pixi add ornaments --path /absolute/path/to/ornaments
+pixi run ornaments --help
+```
+
+The consuming workspace also needs `conda-forge` in its channels. After this
+branch is published, consumers can instead use
+`pixi add ornaments --git https://github.com/alexblakes/ornaments.git --branch pixi-cmake-package`.
+For a distributable Conda artifact, run `pixi build --output-dir dist`; it can
+be uploaded to a Conda channel and installed by package name from that channel.
 
 Run commands with `pixi run ornaments`, or enter `pixi shell` and use
 `ornaments` directly. Every workflow command has `--help`.
@@ -164,13 +182,14 @@ pixi run example-workflow
 pixi run build-package
 ```
 
-After changing local source, use `pixi reinstall ornaments` to rebuild the
-installed package before testing.
+Pixi tracks the native, HTSlib, and Python sources and rebuilds the source
+package when inputs change. Use `pixi reinstall ornaments` to force a reinstall.
 
 The example check runs conversion, merge, sorting, ornament and diploid
 construction, indexing, and paired and single quantification against real
-bundled data. Packaging produces a platform wheel and a source distribution in
-`dist/`. See the installation guide for compatible wheel runtime environments.
+bundled data. `build-package` produces a platform wheel and a source
+distribution in `dist/`; `pixi build --output-dir dist` produces a Conda package.
+See the installation guide for compatible wheel runtime environments.
 
 A standalone native build remains available with installed compiler,
 compression libraries, CMake, make, and autoconf 2.69:

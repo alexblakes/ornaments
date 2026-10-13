@@ -24,8 +24,81 @@ wheel.packages = ["python/ornaments"]
 wheel.license-files = ["LICENSE", "LICENSE.txt", "ext/htslib/LICENSE"]
 cmake.version = ">=3.18"
 cmake.args = ["-DORNAMENTS_INSTALL_DIR=ornaments/_bin", "-DUSE_HDF5=OFF"]
-sdist.include = ["CMakeLists.txt", "src/**", "ext/htslib/**", "python/ornaments/**", "LICENSE", "LICENSE.txt", "pixi.toml", "config/**", "docs/airgapped-installation.md", "examples/**", "tests/**", "build.sh", "meta.yaml", "*_transcriptome*.py", "convert_genomic_vcf_to_transcriptomic_vcf.py"]
+sdist.include = ["CMakeLists.txt", "src/**", "ext/htslib/**", "python/ornaments/**", "LICENSE", "LICENSE.txt", "cmake/**", "config/**", "docs/airgapped-installation.md", "examples/**", "tests/**", "build.sh", "meta.yaml", "*_transcriptome*.py", "convert_genomic_vcf_to_transcriptomic_vcf.py"]
 sdist.exclude = ["**/__pycache__/**", "ext/htslib/src/**", "ext/htslib/tmp/**", ".superpowers/**", ".pixi/**", "_build/**", "dist/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge", "bioconda"]
+platforms = ["linux-64", "osx-64", "osx-arm64"]
+requires-pixi = ">=0.80.0"
+preview = ["pixi-build"]
+
+# Avoid external name-map requests when using internal mirrors.
+[tool.pixi.workspace.conda-pypi-map]
+conda-forge = { mapping-mode = "replace", mapping = { python-build = "build" } }
+bioconda = { mapping-mode = "replace" }
+
+[tool.pixi.dependencies]
+ornaments = { path = "." }
+python = "3.11.*"
+numpy = ">=2,<3"
+biopython = ">=1.81,<2"
+pandas = ">=2,<3"
+gtfparse = ">=2.5,<3"
+# Development tools also support building wheels with scikit-build-core.
+cmake = ">=3.18,<4"
+ninja = "*"
+make = "*"
+autoconf = "2.69.*"
+c-compiler = "*"
+cxx-compiler = "*"
+zlib = "*"
+bzip2 = "*"
+xz = "*"
+scikit-build-core = ">=0.10,<1"
+python-build = "*"
+pip = "*"
+pytest = ">=8,<10"
+
+[tool.pixi.tasks]
+ornaments = "ornaments"
+test = "python -m pytest"
+example-workflow = "python tests/run_example_workflow.py"
+build-package = "python -m build --no-isolation"
+
+# A source package consumable with `pixi add ornaments --path /path/to/ornaments`.
+[tool.pixi.package]
+name = "ornaments"
+version = "1.1.0"
+
+[tool.pixi.package.build]
+backend = { name = "pixi-build-cmake", version = "0.*", channels = ["conda-forge"] }
+
+[tool.pixi.package.build.config]
+compilers = ["c", "cxx"]
+extra-args = ["-DCMAKE_BUILD_TYPE=Release", "-DUSE_HDF5=OFF", "-DORNAMENTS_INSTALL_PYTHON=ON"]
+# HTSlib is built by make; Python modules and metadata are installed by pip.
+extra-input-globs = ["ext/htslib/**", "python/ornaments/**", "pyproject.toml", "README.md", "LICENSE", "LICENSE.txt"]
+
+[tool.pixi.package.build-dependencies]
+cmake = ">=3.18,<4"
+make = "*"
+autoconf = "2.69.*"
+
+[tool.pixi.package.host-dependencies]
+python = "3.11.*"
+pip = "*"
+scikit-build-core = ">=0.10,<1"
+zlib = "*"
+bzip2 = "*"
+xz = "*"
+
+[tool.pixi.package.run-dependencies]
+python = "3.11.*"
+numpy = ">=2,<3"
+biopython = ">=1.81,<2"
+pandas = ">=2,<3"
+gtfparse = ">=2.5,<3"

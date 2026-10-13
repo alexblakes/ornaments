@@ -7,6 +7,6 @@
 
 # Only use these PyPI mappings if the mirror preserves both upstream URL
 # layouts and rewrites wheel links accordingly. Otherwise set index-url in
-# pixi.toml as described in docs/airgapped-installation.md.
+# pyproject.toml as described in docs/airgapped-installation.md.
 "https://pypi.org/simple" = ["https://packages.example.internal/pypi/simple"]
 "https://files.pythonhosted.org/packages" = ["https://packages.example.internal/pypi/packages"]

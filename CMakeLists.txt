@@ -3,6 +3,26 @@ project(ornaments LANGUAGES C CXX)
 include(GNUInstallDirs)
 include(ExternalProject)
 
+option(ORNAMENTS_INSTALL_PYTHON "Install the Python CLI alongside the native engine" OFF)
+if(ORNAMENTS_INSTALL_PYTHON)
+    find_package(Python 3.10 REQUIRED COMPONENTS Interpreter)
+    # Query a relative path so the package remains relocatable after installation.
+    execute_process(
+        COMMAND "${Python_EXECUTABLE}" -c
+            "import sysconfig; print(sysconfig.get_path('purelib', vars={'base': '', 'platbase': ''}).lstrip('/'))"
+        OUTPUT_VARIABLE ORNAMENTS_SITE_PACKAGES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE ORNAMENTS_PYTHON_PATH_RESULT
+    )
+    if(NOT ORNAMENTS_PYTHON_PATH_RESULT EQUAL 0)
+        message(FATAL_ERROR "Could not determine the Python installation directory")
+    endif()
+    set(ORNAMENTS_INSTALL_DIR "${ORNAMENTS_SITE_PACKAGES}/ornaments/_bin" CACHE STRING
+        "Native engine installation directory" FORCE)
+    configure_file(cmake/install-python.cmake.in install-python.cmake @ONLY)
+    install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/install-python.cmake")
+endif()
+
 option(USE_HDF5 "Compile with HDF5 support" OFF)
 set(ORNAMENTS_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}" CACHE STRING "Native engine installation directory")
 set(CMAKE_CXX_STANDARD 14)

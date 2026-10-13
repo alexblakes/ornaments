@@ -1,0 +1,13 @@
+# Install Python modules, distribution metadata and console scripts using the
+# existing pyproject. CMake owns the native build, so disable it in the wheel.
+execute_process(
+    COMMAND "@Python_EXECUTABLE@" -m pip install
+        --no-deps --no-build-isolation --no-index --no-cache-dir
+        --ignore-installed --no-compile
+        --config-settings=wheel.cmake=false
+        --prefix "${CMAKE_INSTALL_PREFIX}" "@PROJECT_SOURCE_DIR@"
+    RESULT_VARIABLE ORNAMENTS_PYTHON_INSTALL_RESULT
+)
+if(NOT ORNAMENTS_PYTHON_INSTALL_RESULT EQUAL 0)
+    message(FATAL_ERROR "Installing the Ornaments Python CLI failed")
+endif()

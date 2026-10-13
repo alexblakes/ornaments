@@ -54,7 +54,7 @@ class BootstrapWriter {
     virtual ~BootstrapWriter() {};
 
     virtual void init(const std::string& fname, int num_bootstrap, int num_processed,
-      const std::vector<int>& fld, const std::vector<int>& preBias, const std::vector<double>& postBias, uint compression, size_t index_version,
+      const std::vector<int>& fld, const std::vector<int>& preBias, const std::vector<double>& postBias, unsigned int compression, size_t index_version,
       const std::string& shell_call, const std::string& start_time) = 0;
 
     virtual void write_main(const EMAlgorithm& em,
