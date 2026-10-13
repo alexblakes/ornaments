@@ -1,126 +1,145 @@
-# Installing in the GERE from Conda channels
+# Installing through internal mirrors
 
-All third-party dependencies come from conda-forge and bioconda, including
-`gtfparse`. No PyPI index, Conda/PyPI name mapping, or scikit-build backend is
-needed. Pip installs only the local Ornaments source or wheel, with downloads
-and dependency resolution disabled.
+Transfer this repository (including `ext/htslib`) or its source distribution
+into the environment. Install Pixi 0.80.0 or newer on the target machine through
+your site's software distribution process. The primary target is Linux x86-64;
+the manifest also supports macOS x86-64 and ARM64. Reference data is supplied
+locally. No Git checkout, GNU source download, or separate Pixi backend channel
+is needed during installation.
 
-## Precompiled Linux bundle (no compiler in the GERE)
+## Configure before installing
 
-The **Build GERE wheel bundle** GitHub Actions workflow builds a Linux x86-64,
-Python 3.11 wheel. After the branch has been pushed, run the workflow from
-GitHub's Actions tab on that branch, or create a `v*` tag to trigger it. Download
-the `ornaments-linux-64-python311` artifact ZIP from the completed run and
-transfer it into the GERE. This is a separate download from GitHub's **Code →
-Download ZIP** source archive. The workflow must finish before a precompiled
-bundle is available; the source archive alone still requires compilation.
-
-Extract the artifact ZIP. It contains a runtime `pixi.toml`, an `artifacts/`
-directory containing the wheel, this guide, and a mirror configuration example.
-Configure the Conda channels as described below, then run from that directory:
-
-```bash
-pixi install
-pixi run install-wheel
-pixi run ornaments --help
-```
-
-This route needs neither setuptools nor CMake, compilers, make, autoconf, or
-scikit-build. Pip unpacks the precompiled wheel; all runtime dependencies are
-installed through Conda. The bundle targets Linux x86-64 with Python 3.11;
-it cannot be used on macOS or ARM64. It still requires compatible Linux/glibc
-and Conda C++ runtime libraries. Validate it on the target host before running
-an analysis. The Linux workflow has to be run on GitHub; a locally built macOS
-wheel cannot substitute for its output.
-
-## Configure internal channels before installing
-
-Use Pixi 0.80.0 or newer. In the applicable `pixi.toml`, replace the existing
-workspace `channels` with your site's actual mirror URLs:
+The recommended route uses explicit internal URLs in `pixi.toml`. Replace the
+workspace channels, replace the name-mapping table with the following entries,
+and add the internal PyPI index to the existing `[pypi-options]` table:
 
 ```toml
 [workspace]
-# Retain the other workspace settings from the manifest.
+# Retain name, version, platforms, and requires-pixi from the existing manifest.
 channels = ["https://packages.example.internal/conda-forge",
             "https://packages.example.internal/bioconda"]
+
+[workspace.conda-pypi-map]
+"https://packages.example.internal/conda-forge" = { mapping-mode = "replace", same-name-heuristic = true, mapping = { python-build = "build" } }
+"https://packages.example.internal/bioconda" = { mapping-mode = "replace", same-name-heuristic = true }
+
+[pypi-options]
+index-url = "https://packages.example.internal/pypi/simple"
+no-build-isolation = ["ornaments"]
 ```
 
-Alternatively, if your mirrors preserve upstream URL layouts, copy
-`config/pixi-mirrors.example.toml` to `.pixi/config.toml` and edit its URLs.
-Keep TLS verification enabled and use the site's trusted CA configuration.
-Store authentication outside tracked files.
+Use your actual URLs, including any required path prefixes. Edit existing
+TOML tables rather than adding duplicate tables. Do not add public channels or
+`extra-index-urls`. The internal PyPI index must serve local wheel/sdist links,
+not links to public `files.pythonhosted.org`. Mapping mode `replace` prevents
+Pixi fetching the external Conda/PyPI name map. The explicit map also ensures
+that Conda's `python-build` satisfies PyPI's `build` package.
 
-The mirrors must contain packages matching the manifest's constraints.
-`gtfparse>=2.5,<3` is supplied by Bioconda, including its transitive dependencies.
-A missing package must be supplied through the site's Conda mirror.
+Alternatively, if your site mirrors preserve upstream URL layouts, copy
+`config/pixi-mirrors.example.toml` to `.pixi/config.toml` and edit every URL.
+The two PyPI mirror entries are needed to redirect both index lookups and
+artifact downloads. The manifest's name mappings already suppress external
+mapping downloads for the canonical channels. A `[pypi-config] index-url` in
+site configuration alone does **not** change an existing workspace's index:
+set `[pypi-options] index-url` in the manifest instead.
 
-If a lockfile from another site was transferred, move it aside before solving
-against your internal URLs:
+Pixi documents these behaviors in its [configuration reference](https://pixi.prefix.dev/latest/reference/pixi_configuration/)
+and [manifest reference](https://pixi.prefix.dev/latest/reference/pixi_manifest/).
+Project `.pixi/config.toml` overrides lower-priority site settings; the
+manifest's explicit channel/index choices define resolution inputs. Keep TLS
+verification enabled and use your site's trusted CA configuration when needed.
+Store authentication through Pixi's supported credential mechanisms, outside
+tracked files.
+
+## Solve and install inside the site
+
+The manifest supplies compilers, CMake, Ninja, make, autoconf 2.69, compression
+libraries, Python 3.11, scientific dependencies, and scikit-build-core. The
+committed HTSlib sources build in a temporary writable directory. HDF5 is
+optional and off by default. The local package uses the environment's build
+requirements without build isolation, so its build performs no downloads.
+
+A new checkout ships without a public lockfile. If a lockfile is transferred
+from another site, move it aside before solving against your internal URLs:
 
 ```bash
 # Only if a lockfile from another site is present:
 mv pixi.lock pixi.lock.previous-site
-```
 
-Keep the resulting site-specific `pixi.lock` for subsequent
-`pixi install --locked` calls. Review channel and artifact URLs in the lockfile.
-With mirror mappings, logical URLs may retain upstream URLs, so keep the
-mirror configuration with the deployment.
-
-## Build from the GitHub source ZIP
-
-Transfer and extract the whole source repository, including `ext/htslib`.
-No Git checkout or native dependency source download is required. The source
-manifest supports Linux x86-64 and macOS x86-64/ARM64. If your mirrors contain
-only Linux packages, reduce its workspace `platforms` to `["linux-64"]` before
-solving. macOS source builds require Apple's command line SDK beforehand.
-
-```bash
 pixi install
-pixi run install-package
 pixi run ornaments --help
+pixi run test
+pixi run example-workflow
 ```
 
-The first command installs the Conda dependencies. The second builds the
-native engine with CMake and installs the Python package with setuptools:
+Pixi solves all declared platforms. If your mirrors contain only the target
+platform, reduce `[workspace] platforms` to `["linux-64"]` (or the deployed
+macOS platform) before installation. Preserve the resulting site-specific
+`pixi.lock`; subsequent installs can use `pixi install --locked`. Review its
+channel and artifact URLs to confirm they point to the site's mirrors. With
+mirror mappings, logical lock URLs may retain canonical upstream URLs, so keep
+`.pixi/config.toml` with the deployment and verify mappings cover every host.
+
+Mirrors must contain the versions matching the manifest constraints, including
+compiler/sysroot packages. PyPI supplies gtfparse and any transitive requirements
+not satisfied by the Conda environment. A missing artifact should be added to
+the mirror rather than opening a public fallback.
+
+## Build once and stage a wheel
+
+For repeated deployments on the same compatible platform, build in the target
+Conda environment:
 
 ```bash
-python -m pip install . --no-deps --no-build-isolation --no-index
-```
-
-All build tools are already supplied by the Conda environment. The committed
-HTSlib sources compile in a writable build directory without downloading
-anything. HDF5 is disabled by default. Repeat `pixi run install-package` after
-changing source files. `pixi install` alone installs dependencies and does not
-install Ornaments.
-
-For manually pasting the new packaging files into an existing RE checkout,
-create the blank files first:
-
-```bash
-touch setup.py MANIFEST.in
-```
-
-## Build and transfer a wheel yourself
-
-On a compatible Linux build host with access to the Conda channels:
-
-```bash
-pixi install
 pixi run build-package
 ```
 
-This creates a platform wheel and source distribution in `dist/`. Transfer
-exactly one matching wheel into `artifacts/` alongside a copy of
-`deploy/pixi.toml` named `pixi.toml`, and use the precompiled installation steps
-above. Keep compatible Conda native runtime dependencies: the wheel contains
-the engine, but does not bundle its compression or C++ shared libraries.
-The source distribution includes the build sources, manifests, and licenses.
+This creates a platform wheel and source distribution under `dist/`. Stage the
+wheel on the site's PyPI index or transfer it directly. A wheel is tied to its
+OS, architecture, compatible libc/macOS baseline, Python environment layout,
+and native compression/C++ runtime libraries. It is not a standalone binary
+bundle: retain compatible Conda runtime dependencies. Wheels built on macOS
+cannot run on Linux.
+
+For a wheel-only deployment, keep Python and scientific/native runtime
+requirements in the manifest, remove source build tools and the
+`no-build-isolation` entry for ornaments, and replace the local path dependency
+with the wheel path (relative to the manifest):
+
+```toml
+[pypi-dependencies]
+gtfparse = ">=2.5,<3"
+ornaments = { path = "artifacts/ornaments-1.1.0-cp311-cp311-linux_x86_64.whl" }
+```
+
+Use the actual generated filename. For macOS retain `libcxx`. For Linux retain `libstdcxx-ng` and
+`libgcc-ng` at versions compatible with the build, along with zlib, bzip2, and
+xz; macOS uses the platform C++ runtime. Keep site name mappings and index
+configuration. Then `pixi install` installs the wheel without invoking a
+compiler. A source distribution can instead be unpacked and installed through
+the same source route; it includes the manifest and vendored HTSlib.
 
 ## Fully offline operation
 
-Reachable internal mirrors allow resolution and installation. A machine with
-no network at all needs a site lockfile and every Conda artifact in Pixi's
-cache beforehand, plus the transferred Ornaments wheel or sources.
-`pixi install --offline --locked` can only reuse packages already cached.
-No PyPI artifacts are needed.
+An environment with reachable internal mirrors can resolve and install new
+packages. A machine with no network at all needs the site lockfile and all
+required Conda and PyPI artifacts in Pixi's cache ahead of time (or a transferred
+complete environment). `pixi install --offline --locked` can only reuse artifacts
+already available locally; mirrors alone do not populate a disconnected host.
+
+## Validation record
+
+Verified with Pixi 0.80.0 on macOS ARM64: all three manifest platforms resolve,
+36 focused tests pass, and the complete bundled workflow passes, including
+paired and single quantification, diploid generation, VCF paths containing
+spaces, gzip VCFs, and transcript-start deletions. The wheel and source
+distribution include the private engine, Python commands, vendored HTSlib
+sources, and required licenses. The built wheel also passes the complete
+workflow and every legacy helper help command in a separate runtime-only Pixi
+environment outside the source checkout. The wheel is tagged for macOS 26 ARM64; use a
+wheel built for your deployment platform instead.
+
+The macOS build links system zlib/bzip2/lzma and the Conda C++ runtime. Linux
+execution and installation against actual site mirrors have not been tested
+in this session; the environment resolves for Linux but requires validation
+on the target host.

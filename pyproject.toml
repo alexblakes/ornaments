@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core>=0.10,<1"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "ornaments"
@@ -19,12 +19,13 @@ merge_transcriptome_vcfs = "ornaments.cli:merge_main"
 create_personalized_transcriptome = "ornaments.cli:personalize_main"
 sort_transcriptome_vcf = "ornaments.cli:sort_main"
 
-[tool.setuptools]
-package-dir = { "" = "python" }
-license-files = ["LICENSE", "LICENSE.txt", "ext/htslib/LICENSE"]
-
-[tool.setuptools.packages.find]
-where = ["python"]
+[tool.scikit-build]
+wheel.packages = ["python/ornaments"]
+wheel.license-files = ["LICENSE", "LICENSE.txt", "ext/htslib/LICENSE"]
+cmake.version = ">=3.18"
+cmake.args = ["-DORNAMENTS_INSTALL_DIR=ornaments/_bin", "-DUSE_HDF5=OFF"]
+sdist.include = ["CMakeLists.txt", "src/**", "ext/htslib/**", "python/ornaments/**", "LICENSE", "LICENSE.txt", "pixi.toml", "config/**", "docs/airgapped-installation.md", "examples/**", "tests/**", "build.sh", "meta.yaml", "*_transcriptome*.py", "convert_genomic_vcf_to_transcriptomic_vcf.py"]
+sdist.exclude = ["**/__pycache__/**", "ext/htslib/src/**", "ext/htslib/tmp/**", ".superpowers/**", ".pixi/**", "_build/**", "dist/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -14,13 +14,11 @@ Use Pixi 0.80.0 or newer. From a local copy of this repository:
 
 ```bash
 pixi install
-pixi run install-package
 pixi run ornaments --help
 ```
 
-Pixi installs all dependencies from conda-forge and bioconda. The local
-`install-package` task uses setuptools and CMake to compile and install the
-Python package and bundled native engine without accessing PyPI. HTSlib is included in
+Pixi installs the Python package and compiles its bundled native engine. All
+build dependencies come from conda-forge/bioconda or PyPI; HTSlib is included in
 the repository. The manifest targets Linux x86-64 and macOS x86-64/ARM64, with
 Python 3.11. The package supports Python >=3.10. HDF5 is optional and disabled
 by default. macOS source builds require Apple's command line SDK to be
@@ -30,10 +28,6 @@ For a restricted environment, **configure internal mirror URLs before running
 `pixi install`**. See [airgapped installation](docs/airgapped-installation.md)
 for strict mirror configuration, lockfiles, source and wheel deployment, and
 fully offline operation. No separate ornaments channel is needed.
-
-For installation without compilers, use the precompiled Linux x86-64 wheel
-bundle described in the installation guide. GitHub's source ZIP contains
-source code; the wheel bundle is a separate download from GitHub Actions.
 
 Run commands with `pixi run ornaments`, or enter `pixi shell` and use
 `ornaments` directly. Every workflow command has `--help`.
@@ -170,7 +164,7 @@ pixi run example-workflow
 pixi run build-package
 ```
 
-After changing local source, use `pixi run install-package` to rebuild the
+After changing local source, use `pixi reinstall ornaments` to rebuild the
 installed package before testing.
 
 The example check runs conversion, merge, sorting, ornament and diploid

@@ -16,8 +16,7 @@ requirements:
   host:
     - python >=3.10
     - pip
-    - setuptools >=61
-    - wheel
+    - scikit-build-core >=0.10,<1
     - zlib
     - bzip2
     - xz
