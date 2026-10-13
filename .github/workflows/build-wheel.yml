@@ -1,0 +1,35 @@
+name: Build GERE wheel bundle
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  linux-wheel:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          pixi-version: v0.80.0
+          cache: false
+          locked: false
+      - name: Build from local sources
+        run: pixi run build-package
+      - name: Assemble runtime bundle
+        run: |
+          mkdir -p bundle/artifacts bundle/config
+          cp dist/*.whl bundle/artifacts/
+          cp deploy/pixi.toml bundle/pixi.toml
+          cp config/pixi-mirrors.example.toml bundle/config/
+          cp docs/airgapped-installation.md bundle/README.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ornaments-linux-64-python311
+          path: bundle/
+          if-no-files-found: error
+          retention-days: 90
